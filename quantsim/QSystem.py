@@ -1,19 +1,18 @@
 from __future__ import division, print_function
-import cmath as cm
 import numpy as np
 import utils
 from transforms import *
 from random import random
-from Qubit import Qubit
 from Transform import Transform
 
 class QSystem:
-    def __init__(self, num_qubits=2):
+    def __init__(self, num_qubits=2, rand=None):
         if num_qubits == 0:
             raise ValueError("System must have >= 0 qubits")
         self.N = num_qubits
         self._state = np.array([0] * (2 ** num_qubits), dtype=complex)
         self._state[0] = 1
+        self.r = rand if rand else random
 
     def single_gate(self, T, i):
         """Apply the transformation T to the ith qubit
@@ -84,6 +83,58 @@ class QSystem:
             raise ValueError("Wrong number of qubits. Expecting {0}, got {1}".format(self.N, total))
         T = utils.create_transform([t.T for t in transforms])
         self._state = T.dot(self._state)
+
+    def measure(self, qubits):
+        """Measure the specified qubits and update state accordingly.
+        qubits is a list of numbers 0..N-1
+        """
+        qubits = list(set(qubits))
+        for q in qubits:
+            if q < 0 or q >= self.N:
+                raise ValueError("Invalid qubit: {0}".format(q))
+        measurements = []
+        for q in qubits:
+            measurements.append(self.measure_one(q))
+        return measurements
+
+    def measure_one(self, qubit):
+        """Measure a single qubit and update the state accordingly.
+        qubit is a number 0..N-1
+
+        >>> qs = QSystem(2, lambda: 0)
+        >>> qs.transform([H, H])
+        >>> qs.measure_one(0)
+        0
+        >>> qs
+        (0.707106781187+0j)|00> + (0.707106781187+0j)|01> + 0j|10> + 0j|11>
+        >>> qs = QSystem(2, lambda: 1)
+        >>> qs.transform([H, H])
+        >>> qs.measure_one(0)
+        1
+        >>> qs
+        0j|00> + 0j|01> + (0.707106781187+0j)|10> + (0.707106781187+0j)|11>
+        >>> qs = QSystem(2)
+        >>> qs.transform([H, I])
+        >>> qs.transform([CNOT])
+        >>> m1 = qs.measure_one(0)
+        >>> m2 = qs.measure_one(1)
+        >>> m1 == m2
+        True
+        """
+        p0 = 0              # the probability that the qubit is in the 0 state
+        shift = self.N - qubit - 1
+        for i, s in enumerate(self._state):
+            if (i >> shift) & 1 == 0:
+                p0 += s * s.conjugate()
+        if p0 > self.r():
+            result = 0
+        else:
+            result = 1
+        for i in range(len(self._state)):
+            if (i >> shift) & 1 != result:
+                self._state[i] = 0
+        self._state = utils.normalize(self._state)
+        return result
 
     @property
     def state(self):
