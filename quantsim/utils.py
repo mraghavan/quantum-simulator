@@ -22,7 +22,7 @@ def identity(N):
     l = [0] * (N ** 2)
     for i in range(N):
         l[i * N + i] = 1
-    I = np.array(l, dtype=complex)
+    I = np.array(l)
     return I.reshape(N, N)
 
 def tensor(u, v):
@@ -33,3 +33,29 @@ def tensor(u, v):
             l[i] = e1 * e2
             i += 1
     return l
+
+def create_transform(transforms):
+    """Transforms is a list of unitary arrays"""
+    S = transforms[0]
+    for T in transforms[1:]:
+        S = np.kron(S, T)
+    return S
+
+def swap_columns(T, i, j):
+    T[:,[i,j]] = T[:,[j,i]]
+
+def swap(N, i, j):
+    """Creates a transformation that swaps the position of qubits i and j"""
+    if i > j:
+        return swap(N, j, i)
+    # easier to work with 1..N instead of 0..N-1
+    i += 1
+    j += 1
+    I = identity(2 ** N)
+    # swap distance is difference between powers of 2
+    diff = 2 ** (N - i) - 2 ** (N - j)
+    for k in range(2 ** N):
+        # swap columns if k[i] = 0 and k[j] = 1
+        if ((1 << (N - i)) & k) == 0 and ((1 << (N - j)) & k) > 0:
+            swap_columns(I, k, k + diff)
+    return I
