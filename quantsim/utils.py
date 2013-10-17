@@ -3,13 +3,31 @@ import numpy as np
 import cmath as cm
 
 def normalize(v):
+    """Returns an array normalized to have magnitude 1.
+
+    >>> normalize(np.array([3, 4]))
+    array([ 0.6+0.j,  0.8+0.j])
+    """
     return v / magnitude(v)
 
 def magnitude(v):
-    return cm.sqrt(v.dot(v))
+    """Finds the magnitude of an array
+    
+    >>> magnitude(np.array([1j, 1]))
+    (1.4142135623730951+0j)
+    """
+    return cm.sqrt(v.dot(v.conjugate()))
 
 def check_transform(T, N):
-    """Takes advantage of the fact that if T is unitary, then T x T.conjugate.transpose is the identity"""
+    """Raises an error if T is not a unitary matrix
+    Takes advantage of the fact that if T is unitary, then T x T.conjugate.transpose is the identity
+    
+    >>> check_transform(np.array([[1, 0], [0, -1]]), 2)
+    >>> check_transform(np.array([[1, 1], [0, -1]]), 2)
+    Traceback (most recent call last):
+        ...
+    ValueError: Transformation must be unitary
+    """
     if type(T) != np.ndarray:
         raise ValueError("Transformation must be an array")
     if T.shape != (N, N):
@@ -19,6 +37,13 @@ def check_transform(T, N):
         raise ValueError("Transformation must be unitary")
 
 def identity(N):
+    """Returns an N x N identity matrix
+
+    >>> identity(3)
+    array([[1, 0, 0],
+           [0, 1, 0],
+           [0, 0, 1]])
+    """
     l = [0] * (N ** 2)
     for i in range(N):
         l[i * N + i] = 1

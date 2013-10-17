@@ -7,6 +7,24 @@ from Transform import Transform
 
 class QSystem:
     def __init__(self, num_qubits=2, rand=None):
+        """Constructs an N-qubit system, where N = num_qubits
+        rand is the random number generator used for measurement.
+        It can be substituted with any function that returns a number
+        on the interval [0,1)
+
+        >>> qs = QSystem(0)
+        Traceback (most recent call last):
+            ...
+        ValueError: System must have >= 0 qubits
+        >>> qs = QSystem(2)
+        >>> len(qs.state)
+        4
+        >>> qs = QSystem(3, lambda: 0)
+        >>> len(qs.state)
+        8
+        >>> qs.r()
+        0
+        """
         if num_qubits == 0:
             raise ValueError("System must have >= 0 qubits")
         self.N = num_qubits
@@ -18,6 +36,10 @@ class QSystem:
         """Apply the transformation T to the ith qubit
 
         >>> qs = QSystem(2)
+        >>> qs.single_gate(H, 2)
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid qubit: 2
         >>> qs.single_gate(H, 0)
         >>> qs
         (0.707106781187+0j)|00> + 0j|01> + (0.707106781187+0j)|10> + 0j|11>
@@ -30,7 +52,7 @@ class QSystem:
         """
         
         if i < 0 or i >= self.N:
-            raise ValueError("Invalid qubit: " + str(i))
+            raise ValueError("Invalid qubit: {0}".format(i))
         transforms = [I] * self.N
         transforms[i] = T
         self.transform(transforms)
@@ -52,18 +74,35 @@ class QSystem:
         """
         if i < 0 or i >= self.N - 1:
             raise ValueError("Invalid qubit: " + str(i))
+        # self.N - 1 transformations because T acts on 2 qubits
         transforms = [I] * (self.N - 1)
         transforms[i] = T
+        # Switch the order of the qubits so i and j are adjacent
+        # i.g. i = 0, j = 2
+        #            ___
+        # 0 ________|   |_______
+        #           | T |
+        # 1 ___  ___|   |__  ___
+        #      \/   |___|  \/
+        # 2 ___/\__________/\___
         if j:
             S = utils.swap(self.N, i + 1, j)
             self._state = S.dot(self._state)
-        self.transform(transforms)
+        e = None
+        try:
+            self.transform(transforms)
+        except ValueError as v:
+            e = v
+        # Switch back
         if j:
             S = utils.swap(self.N, i + 1, j)
             self._state = S.dot(self._state)
+        if e:
+            # make sure the system is switched back if there is an error
+            raise e
 
     def transform(self, transforms):
-        """Transforms is formatted like [(H, 1), (CNOT, 2), (I, 1)]
+        """transforms is a list of Transform objects.
 
         >>> qs = QSystem(2)
         >>> qs.transform([H, I])
@@ -87,8 +126,21 @@ class QSystem:
     def measure(self, qubits):
         """Measure the specified qubits and update state accordingly.
         qubits is a list of numbers 0..N-1
+        Returns a list of measured quantities in sorted order
+
+        >>> qs = QSystem(2, lambda: 0)
+        >>> qs.transform([H, H])
+        >>> qs.measure([0, 2])
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid qubit: 2
+        >>> qs.measure([0, 1])
+        [0, 0]
+        >>> qs
+        (1+0j)|00> + 0j|01> + 0j|10> + 0j|11>
         """
         qubits = list(set(qubits))
+        qubits.sort()
         for q in qubits:
             if q < 0 or q >= self.N:
                 raise ValueError("Invalid qubit: {0}".format(q))
@@ -100,6 +152,7 @@ class QSystem:
     def measure_one(self, qubit):
         """Measure a single qubit and update the state accordingly.
         qubit is a number 0..N-1
+        Returns the measured value
 
         >>> qs = QSystem(2, lambda: 0)
         >>> qs.transform([H, H])
